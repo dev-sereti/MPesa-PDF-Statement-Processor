@@ -1,0 +1,56 @@
+# docker-compose.yml
+version: '3.9'
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      - DEBUG=false
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_ORIGINS=https://yourdomain.com
+      - MAX_FILE_SIZE_MB=10
+      - SESSION_EXPIRE_MINUTES=30
+    volumes:
+      - /tmp/mpesa_uploads:/tmp/mpesa_uploads
+      - /tmp/mpesa_outputs:/tmp/mpesa_outputs
+    networks:
+      - app-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app-network
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  app-network:
+    driver: bridge
+    internal: false
